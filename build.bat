@@ -7,10 +7,10 @@ if not exist "%UV4%" (
   echo [ERROR] Keil uVision not found at:
   echo %UV4%
   echo.
-  echo Open car.uvproj manually, or edit UV4 in this file.
+  echo Open Project\car.uvproj manually, or edit UV4 in this file.
   pause
   exit /b 1
 )
 
-"%UV4%" -b car.uvproj -j0
+"%UV4%" -b Project\car.uvproj -j0
 exit /b %ERRORLEVEL%
