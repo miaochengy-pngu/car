@@ -272,7 +272,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>.\inc</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking</IncludePath>
             </VariousControls>
           </C51>
 
@@ -285,7 +285,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>.\inc</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking</IncludePath>
             </VariousControls>
           </Ax51>
 
@@ -330,7 +330,7 @@
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\main.c</FilePath>
+              <FilePath>..\User\main.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -341,17 +341,17 @@
             <File>
               <FileName>motor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\src\motor.c</FilePath>
+              <FilePath>..\Hardware\Motor\motor.c</FilePath>
             </File>
             <File>
               <FileName>tracking.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\src\tracking.c</FilePath>
+              <FilePath>..\Hardware\Tracking\tracking.c</FilePath>
             </File>
             <File>
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
-              <FilePath>.\src\delay.c</FilePath>
+              <FilePath>..\System\delay.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -362,22 +362,22 @@
             <File>
               <FileName>config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\inc\config.h</FilePath>
+              <FilePath>..\System\config.h</FilePath>
             </File>
             <File>
               <FileName>motor.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\inc\motor.h</FilePath>
+              <FilePath>..\Hardware\Motor\motor.h</FilePath>
             </File>
             <File>
               <FileName>tracking.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\inc\tracking.h</FilePath>
+              <FilePath>..\Hardware\Tracking\tracking.h</FilePath>
             </File>
             <File>
               <FileName>delay.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\inc\delay.h</FilePath>
+              <FilePath>..\System\delay.h</FilePath>
             </File>
           </Files>
         </Group>
