@@ -1,0 +1,23 @@
+# Keil C51 generated files
+Objects/
+Listings/
+*.hex
+*.bin
+*.axf
+*.m51
+*.map
+*.lst
+*.obj
+*.o
+*.lnp
+*.build_log.htm
+*.uvguix.*
+*.uvopt
+*.uvoptx
+*.bak
+
+# STC-ISP / editor temporary files
+*.tmp
+*.user
+.DS_Store
+Thumbs.db
