@@ -2,64 +2,56 @@
 #define __CAR_CONFIG_H__
 
 /*
- * Competition-oriented configuration for the A11 C51 line follower.
+ * A11 红外循迹验收版参数
  *
- * Sensor module:
- *   white background = 0
- *   black line       = 1
+ * 目标：
+ * 1. 完成时间
+ * 2. 循迹精度（尽量不压线）
+ * 3. 稳定性（尽量不蛇形震荡）
  */
-#define TRACK_BLACK_LEVEL 1
+
+/* 手册确认：白底=0，黑线=1 */
+#define TRACK_BLACK_LEVEL       1
 
 /*
- * At power-on, place the car centered on the track.
- * The firmware samples the two sensors and decides whether the
- * nominal centered state is 00 or 11. This avoids hard-coding one
- * mounting geometry.
- */
-#define TRACK_AUTO_CENTER_ENABLE 1
-#define TRACK_CENTER_DEFAULT     0
-
-/*
- * Steering PID gains are stored x100.
+ * 两个探头“居中”时的状态：
+ * 3 = 11：两个探头都在黑线上
+ * 0 = 00：黑线位于两个探头之间
  *
- * For this two-digital-sensor car, Ki intentionally starts at 0.
- * The controller is therefore initially PD, but the complete I term
- * and anti-windup path are implemented and can be enabled later.
+ * 3 cm 黑线默认先用 11。
+ * 如果实车居中时两个指示灯都是亮的，把 3 改成 0。
  */
-#define STEER_KP_X100          24
-#define STEER_KI_X100           0
-#define STEER_KD_X100          18
+#define TRACK_CENTER_PATTERN    3
 
-#define STEER_INTEGRAL_LIMIT  500
-#define STEER_OUTPUT_LIMIT     55
-#define TRACK_ERROR_FULL      100
+/* 离散误差幅值 */
+#define TRACK_ERROR             100
 
 /*
- * Speed profile, in PWM percent.
- * Raise SPEED_STRAIGHT only after the sensor polarity and motor
- * directions have been verified on the real car.
- */
-#define SPEED_STRAIGHT          88
-#define SPEED_MIN               42
-#define SPEED_MAX               96
-#define SPEED_SLOWDOWN_MAX      34
-
-/*
- * When the sensors enter the pattern opposite to the calibrated
- * center state, keep searching in the most recently observed
- * steering direction instead of driving blindly straight.
- */
-#define SEARCH_FORWARD_SPEED    62
-#define SEARCH_REVERSE_SPEED    26
-#define SPECIAL_STRAIGHT_SPEED  55
-
-/*
- * After leaving an edge sensor, decay the previous steering command
- * for a short time. This is useful with only two digital sensors:
- * it damps snap-back and gives a little line-loss memory.
+ * PD 参数，数值放大 100 倍保存：
+ * Kp = 0.22
+ * Ki = 0
+ * Kd = 0.12
  *
- * Control loop is 1 kHz, so this value is approximately milliseconds.
+ * PID 模块保留完整 I 项，但本次简单验收先不用积分。
  */
-#define STEERING_MEMORY_TICKS   12
+#define STEER_KP_X100           22
+#define STEER_KI_X100            0
+#define STEER_KD_X100           12
+
+#define STEER_INTEGRAL_LIMIT   300
+#define STEER_OUTPUT_LIMIT      38
+
+/*
+ * PWM 百分比。
+ * 直线较快，检测到偏线时自动降一点速度。
+ */
+#define SPEED_STRAIGHT           72
+#define SPEED_TURN               58
+
+/*
+ * 完全丢线/特殊状态时，按最近一次偏移方向低速找回。
+ */
+#define RECOVER_INNER_SPEED      24
+#define RECOVER_OUTER_SPEED      52
 
 #endif
