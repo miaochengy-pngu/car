@@ -1,17 +1,29 @@
-# STC89C52RC 红外循迹竞赛小车
+# STC89C52RC 红外循迹小车
 
-这是一个完整的 Keil C51 工程。当前版本已经从最初的四状态 demo 控制升级为：
+当前版本按“简单验收”整理，不再做复杂竞赛状态机。
 
-- Timer0 软件 PWM
-- L298N ENA / ENB 独立调速
-- 整数定点 PID 控制器
-- 默认 PD 转向控制（完整 I 项已实现，初始 Ki=0）
-- 直线高速 / 弯道自动降速
-- 短时转向记忆
-- 丢线 / 特殊状态按上一转向方向搜索
-- 启动时自动判断“居中状态是 00 还是 11”
-- 1 kHz 控制循环
-- 200 Hz 电机 PWM
+验收重点：
+
+- 完成时间
+- 循迹精度（是否压线）
+- 稳定性（是否频繁左右震荡）
+- 每组重复 2 轮取平均
+
+因此控制器采用：
+
+```text
+双路红外
+   ↓
+离散误差
+   ↓
+PD
+   ↓
+左右 PWM 差速
+   ↓
+L298N
+```
+
+其中 PID 模块仍保留完整 P/I/D，但默认 `Ki=0`，实际先按 PD 使用。
 
 ## 工程结构
 
@@ -38,14 +50,10 @@ car/
 │  └─ PWM/
 │     ├─ pwm.c
 │     └─ pwm.h
-├─ System/
-│  ├─ config.h
-│  ├─ delay.c
-│  └─ delay.h
-├─ docs/
-│  ├─ HARDWARE_NOTES.md
-│  └─ OPEN_SOURCE_REVIEW.md
-└─ build.bat
+└─ System/
+   ├─ config.h
+   ├─ delay.c
+   └─ delay.h
 ```
 
 双击：
@@ -56,67 +64,129 @@ Project/car.uvproj
 
 即可打开 Keil C51 工程。
 
-## 当前比赛控制链
+## 当前控制逻辑
+
+红外模块：
 
 ```text
-OTL / OTR
-    ↓
-Tracking
-    ↓
-离散位置误差 + 转向记忆
-    ↓
-PID / PD
-    ↓
-自适应基础速度 + 差速修正
-    ↓
-signed left/right motor command
-    ↓
-200 Hz software PWM
-    ↓
-ENA / ENB
-    ↓
-L298N
+白底 -> 0 -> 指示灯亮
+黑线 -> 1 -> 指示灯灭
 ```
 
-## 关键调参位置
+两路状态编码：
 
-所有首要参数集中在：
+```text
+00 = 两个探头都白
+01 = 右探头黑
+10 = 左探头黑
+11 = 两个探头都黑
+```
+
+默认按 3 cm 黑线，先设置：
+
+```c
+#define TRACK_CENTER_PATTERN 3
+```
+
+即正常居中时为 `11`。
+
+如果你把车摆在线中央时发现两个循迹指示灯都是亮的，说明实际居中是 `00`，只需把：
+
+```c
+#define TRACK_CENTER_PATTERN 3
+```
+
+改成：
+
+```c
+#define TRACK_CENTER_PATTERN 0
+```
+
+不需要改其他代码。
+
+## PD 差速
+
+有效误差：
+
+```text
+10 -> error = -100 -> 向左修正
+居中 -> error = 0
+01 -> error = +100 -> 向右修正
+```
+
+控制器：
+
+```text
+correction = Kp * error + Kd * (error - last_error)
+
+left_pwm  = base_speed + correction
+right_pwm = base_speed - correction
+```
+
+偏线时使用较低基础速度，直线使用较高基础速度。
+
+## 当前初始参数
+
+全部集中在：
 
 ```text
 System/config.h
 ```
 
-当前初值：
+当前值：
 
 ```c
-#define STEER_KP_X100          24
-#define STEER_KI_X100           0
-#define STEER_KD_X100          18
+#define STEER_KP_X100           22
+#define STEER_KI_X100            0
+#define STEER_KD_X100           12
 
-#define SPEED_STRAIGHT          88
-#define SPEED_MIN               42
-#define SPEED_MAX               96
-#define SPEED_SLOWDOWN_MAX      34
+#define SPEED_STRAIGHT           72
+#define SPEED_TURN               58
 
-#define SEARCH_FORWARD_SPEED    62
-#define SEARCH_REVERSE_SPEED    26
-#define STEERING_MEMORY_TICKS   12
+#define RECOVER_INNER_SPEED      24
+#define RECOVER_OUTER_SPEED      52
 ```
 
-### 推荐调参顺序
+解释：
 
-1. 先确认左右电机方向、红外极性完全正确。
-2. 先保持 `Ki=0`。
-3. 从较低 `SPEED_STRAIGHT` 开始确认不丢线。
-4. 提高 `Kp` 直到能迅速回线，但不要蛇形振荡。
-5. 提高 `Kd` 抑制振荡和冲过头。
-6. 再逐步提高 `SPEED_STRAIGHT`。
-7. 高速弯道容易飞线时，提高 `SPEED_SLOWDOWN_MAX` 或降低 `SPEED_MIN`。
-8. 只有出现长期固定偏差时，再尝试很小的 `Ki`。
+- `SPEED_STRAIGHT`：直接影响完成时间。
+- `Kp`：越大，偏线后拉回越快。
+- `Kd`：主要抑制左右来回震荡。
+- `SPEED_TURN`：弯道速度，太高容易压线。
+- `Ki=0`：当前验收不需要积分。
+
+## 建议调参顺序
+
+先保证能稳定跑完整圈，再提速。
+
+推荐顺序：
+
+```text
+1. SPEED_STRAIGHT = 60~65，先验证稳定
+2. 调 Kp，让偏线后能及时回来
+3. 调 Kd，把蛇形震荡压下去
+4. SPEED_STRAIGHT 提到 70、75、80...
+5. 每个参数组合跑 2 轮，记录平均时间
+6. 一旦开始明显压线/震荡，就退回上一档
+```
+
+不要一开始追求最高 PWM。两轮取平均时，“稍慢但稳定”的参数通常比“一轮很快、一轮跑飞”更划算。
+
+## PWM
+
+Timer0 软件 PWM：
+
+```text
+PWM 频率约 200 Hz
+控制器更新频率约 200 Hz
+PWM 分辨率约 4%
+```
+
+ENA / ENB 独立控制左右轮速度。
 
 ## 硬件接线
 
-### L298N 控制
+### L298N
 
 | L298N | C51 主控板 | MCU |
 |---|---|---|
@@ -137,7 +207,7 @@ System/config.h
 右电机黑线 -> OUT3
 ```
 
-### 红外循迹
+### 红外
 
 ```text
 OTL -> P3.5
@@ -146,44 +216,20 @@ GND -> GND
 VCC -> VCC
 ```
 
-模块逻辑：
+## 当前版本原则
 
-```text
-白底 -> 0 -> 指示灯亮
-黑线 -> 1 -> 指示灯灭
-```
+不做：
 
-## 启动方式
+- 自动中心识别
+- 复杂环岛/路口状态机
+- 多级速度规划
+- 假的编码器速度 PID
 
-因为双数字传感器可能有两种安装几何，程序不再强行假设居中一定是 `00`。
+只保留验收真正有用的：
 
-比赛启动时：
+- PD
+- PWM
+- 差速
+- 一个简单的丢线按上一方向找回
 
-1. 把车摆正、居中放在黑线上；
-2. 再打开主控板电源；
-3. 程序等待约 0.5 s；
-4. 自动采样约 0.13 s；
-5. 自动确定居中是 `00` 还是 `11`；
-6. 随后进入闭环循迹。
-
-## 关于“速度 PID”
-
-本套件原配没有轮速编码器，因此不能凭空实现真实的左右轮速度闭环 PID。
-
-当前实现的是：
-
-- **方向 PID/PD**：根据红外误差计算左右差速；
-- **PWM 速度调节**：通过 ENA/ENB 改变左右电机占空比；
-- **自适应速度规划**：直道快、转弯自动降速。
-
-如果以后加编码器，再增加左右轮独立速度 PI/PID，形成“方向外环 + 轮速内环”。
-
-## 开源调研
-
-见：
-
-```text
-docs/OPEN_SOURCE_REVIEW.md
-```
-
-其中记录了本版本参考的开源 line-follower 项目及实际采用的控制策略。
+这样更适合这次课程验收。
