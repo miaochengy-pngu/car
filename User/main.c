@@ -1,21 +1,32 @@
-#include "config.h"
 #include "delay.h"
+#include "pwm.h"
 #include "motor.h"
 #include "tracking.h"
+#include "line_control.h"
 
 void main(void)
 {
     tracking_init();
+    pwm_init();
+    motor_init();
 
-    motor_enable();
-    car_stop();
+    /*
+     * Keep the car centered on the track during power-up.
+     * This allows the firmware to learn whether the nominal
+     * center sensor pattern is 00 or 11.
+     */
+    delay_ms(500);
+    tracking_calibrate_center();
 
-    /* Wait for the power rail and LM393 comparators to stabilize. */
-    delay_ms(800);
+    line_control_init();
+    pwm_clear_control_tick();
 
     while (1)
     {
-        tracking_control();
-        delay_ms(CONTROL_PERIOD_MS);
+        if (pwm_control_tick_ready())
+        {
+            pwm_clear_control_tick();
+            line_control_step();
+        }
     }
 }
