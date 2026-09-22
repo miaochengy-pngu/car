@@ -1,31 +1,26 @@
 #include <REG52.H>
 #include "pwm.h"
 
-/*
- * ENA/ENB come directly from the A11 main-board motor header.
- */
-sbit PWM_LEFT_EN  = P1^5;   /* ENA */
-sbit PWM_RIGHT_EN = P1^0;   /* ENB */
+/* A11 主控板：ENA=P1.5，ENB=P1.0 */
+sbit PWM_LEFT_EN  = P1^5;
+sbit PWM_RIGHT_EN = P1^0;
 
 /*
- * Timer0:
- *   Fosc = 11.0592 MHz
- *   classic 12T timer clock = 921600 Hz
- *   200 us ~= 184 timer counts
- *   reload = 65536 - 184 = 0xFF48
+ * Fosc = 11.0592 MHz，传统 12T 8051：
+ * Timer0 时钟约 921.6 kHz。
  *
- * PWM:
- *   25 phases x 200 us = 5 ms period = 200 Hz
- *   resolution = 4%
+ * 200 us 中断一次：
+ *   25 个相位 -> 5 ms PWM 周期 -> 200 Hz
+ *   PWM 分辨率 4%
  *
- * Control loop:
- *   every 5 ISR calls = 1 ms = 1 kHz controller update.
+ * 每 25 次中断产生一次控制节拍：
+ *   控制周期 5 ms -> 200 Hz
  */
-#define TIMER0_RELOAD_H  0xFF
-#define TIMER0_RELOAD_L  0x48
+#define TIMER0_RELOAD_H   0xFF
+#define TIMER0_RELOAD_L   0x48
 
-#define PWM_PHASES       25
-#define CONTROL_DIVIDER  5
+#define PWM_PHASES        25
+#define CONTROL_DIVIDER   25
 
 static volatile unsigned char g_left_steps = 0;
 static volatile unsigned char g_right_steps = 0;
@@ -64,7 +59,7 @@ void pwm_init(void)
     g_control_tick = 0;
 
     TMOD &= 0xF0;
-    TMOD |= 0x01;           /* Timer0 mode 1, 16-bit timer */
+    TMOD |= 0x01;
 
     TH0 = TIMER0_RELOAD_H;
     TL0 = TIMER0_RELOAD_L;
@@ -123,23 +118,8 @@ void Timer0_ISR(void) interrupt 1 using 1
         g_pwm_phase = 0;
     }
 
-    if (g_pwm_phase < g_left_steps)
-    {
-        PWM_LEFT_EN = 1;
-    }
-    else
-    {
-        PWM_LEFT_EN = 0;
-    }
-
-    if (g_pwm_phase < g_right_steps)
-    {
-        PWM_RIGHT_EN = 1;
-    }
-    else
-    {
-        PWM_RIGHT_EN = 0;
-    }
+    PWM_LEFT_EN = (g_pwm_phase < g_left_steps) ? 1 : 0;
+    PWM_RIGHT_EN = (g_pwm_phase < g_right_steps) ? 1 : 0;
 
     g_control_divider++;
 
