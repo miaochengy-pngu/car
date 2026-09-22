@@ -1,21 +1,14 @@
 #ifndef __MOTOR_H__
 #define __MOTOR_H__
 
-void motor_enable(void);
-void motor_disable(void);
-
-void left_motor_forward(void);
-void left_motor_reverse(void);
-void left_motor_stop(void);
-
-void right_motor_forward(void);
-void right_motor_reverse(void);
-void right_motor_stop(void);
-
-void car_stop(void);
-void car_forward(void);
-void car_backward(void);
-void car_turn_left(void);
-void car_turn_right(void);
+/*
+ * Signed motor command:
+ *   +100 = full forward
+ *      0 = stop
+ *   -100 = full reverse
+ */
+void motor_init(void);
+void motor_set(int left_command, int right_command);
+void motor_stop(void);
 
 #endif
