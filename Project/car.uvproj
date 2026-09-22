@@ -272,7 +272,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Algorithm\PID;..\Control</IncludePath>
             </VariousControls>
           </C51>
 
@@ -285,7 +285,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Algorithm\PID;..\Control</IncludePath>
             </VariousControls>
           </Ax51>
 
@@ -336,6 +336,38 @@
         </Group>
 
         <Group>
+          <GroupName>CONTROL</GroupName>
+          <Files>
+            <File>
+              <FileName>line_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Control\line_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>line_control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Control\line_control.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+
+        <Group>
+          <GroupName>ALGORITHM</GroupName>
+          <Files>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Algorithm\PID\pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Algorithm\PID\pid.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+
+        <Group>
           <GroupName>HARDWARE</GroupName>
           <Files>
             <File>
@@ -344,14 +376,29 @@
               <FilePath>..\Hardware\Motor\motor.c</FilePath>
             </File>
             <File>
+              <FileName>motor.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Hardware\Motor\motor.h</FilePath>
+            </File>
+            <File>
               <FileName>tracking.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Hardware\Tracking\tracking.c</FilePath>
             </File>
             <File>
-              <FileName>delay.c</FileName>
+              <FileName>tracking.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Hardware\Tracking\tracking.h</FilePath>
+            </File>
+            <File>
+              <FileName>pwm.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\System\delay.c</FilePath>
+              <FilePath>..\Hardware\PWM\pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>pwm.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Hardware\PWM\pwm.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -365,14 +412,9 @@
               <FilePath>..\System\config.h</FilePath>
             </File>
             <File>
-              <FileName>motor.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Motor\motor.h</FilePath>
-            </File>
-            <File>
-              <FileName>tracking.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Hardware\Tracking\tracking.h</FilePath>
+              <FileName>delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\System\delay.c</FilePath>
             </File>
             <File>
               <FileName>delay.h</FileName>
