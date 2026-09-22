@@ -1,6 +1,6 @@
 #include <REG52.H>
 #include "config.h"
-#include "motor.h"
+#include "delay.h"
 #include "tracking.h"
 
 /*
@@ -10,6 +10,8 @@
  */
 sbit TRACK_LEFT  = P3^5;   /* OTL */
 sbit TRACK_RIGHT = P3^4;   /* OTR */
+
+static unsigned char g_center_pattern = TRACK_CENTER_DEFAULT;
 
 static unsigned char is_black(unsigned char level)
 {
@@ -22,37 +24,81 @@ static unsigned char is_black(unsigned char level)
 
 void tracking_init(void)
 {
-    /* Release the quasi-bidirectional 8051 pins for input. */
-    TRACK_LEFT  = 1;
+    /*
+     * 8051 quasi-bidirectional inputs are released by writing 1.
+     */
+    TRACK_LEFT = 1;
     TRACK_RIGHT = 1;
+
+    g_center_pattern = TRACK_CENTER_DEFAULT;
 }
 
-void tracking_control(void)
+unsigned char tracking_read_pattern(void)
 {
     unsigned char left_black;
     unsigned char right_black;
 
-    left_black  = is_black(TRACK_LEFT);
+    left_black = is_black(TRACK_LEFT);
     right_black = is_black(TRACK_RIGHT);
 
-    if ((left_black == 0) && (right_black == 0))
+    return (unsigned char)((left_black << 1) | right_black);
+}
+
+void tracking_calibrate_center(void)
+{
+#if TRACK_AUTO_CENTER_ENABLE
+    unsigned char counts[4];
+    unsigned char i;
+    unsigned char pattern;
+    unsigned char best_pattern;
+    unsigned char best_count;
+
+    counts[0] = 0;
+    counts[1] = 0;
+    counts[2] = 0;
+    counts[3] = 0;
+
+    /*
+     * Place the car centered on the track before power-on.
+     * 64 samples over about 128 ms reject comparator chatter.
+     */
+    for (i = 0; i < 64; i++)
     {
-        car_forward();
+        pattern = tracking_read_pattern();
+        counts[pattern]++;
+        delay_ms(2);
     }
-    else if ((left_black == 1) && (right_black == 0))
+
+    best_pattern = 0;
+    best_count = counts[0];
+
+    for (i = 1; i < 4; i++)
     {
-        car_turn_left();
+        if (counts[i] > best_count)
+        {
+            best_count = counts[i];
+            best_pattern = i;
+        }
     }
-    else if ((left_black == 0) && (right_black == 1))
+
+    /*
+     * A sensible centered two-sensor geometry is normally 00
+     * (line between sensors) or 11 (both sensors over a wide line).
+     * If startup was misaligned, fall back to the configured default.
+     */
+    if ((best_pattern == TRACK_PATTERN_BOTH_WHITE) ||
+        (best_pattern == TRACK_PATTERN_BOTH_BLACK))
     {
-        car_turn_right();
+        g_center_pattern = best_pattern;
     }
     else
     {
-#if STOP_ON_BOTH_BLACK
-        car_stop();
-#else
-        car_forward();
-#endif
+        g_center_pattern = TRACK_CENTER_DEFAULT;
     }
+#endif
+}
+
+unsigned char tracking_get_center_pattern(void)
+{
+    return g_center_pattern;
 }
