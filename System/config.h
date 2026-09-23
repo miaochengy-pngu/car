@@ -4,44 +4,27 @@
 /*
  * 双路数字红外 + L298N。
  *
- * 白底 = 0
- * 黑线 = 1
+ * 黑线 -> 灯灭 -> 1
+ * 白底 -> 灯亮 -> 0
  */
 #define TRACK_BLACK_LEVEL          1
 
 /*
- * 小车居中时黑线位于两探头之间：
- *   00 -> 直行
- *   10 -> 触发左转
- *   01 -> 触发右转
- *   11 -> 方向不明确
+ * 直线左右轮独立调节，用来补偿两台电机实际转速差。
+ * 当前软件 PWM 分辨率约 5%。
  */
-#define TRACK_CENTER_PATTERN       0
+#define SPEED_STRAIGHT_LEFT       90
+#define SPEED_STRAIGHT_RIGHT      90
 
 /*
- * 直线左右轮分开调，用来补偿两个电机实际转速差异。
- */
-#define SPEED_STRAIGHT_LEFT       70
-#define SPEED_STRAIGHT_RIGHT      70
-
-/*
- * 转弯动作。
- * TURN_INNER_SPEED 可以写负数实现内轮反转。
+ * 转弯采用开源 STC89C52RC 循迹例程里常见的“直接动作”结构：
  *
- * 例如：
- *   左转 = inner / outer
- *   右转 = outer / inner
+ * 左转：左轮反转，右轮正转
+ * 右转：左轮正转，右轮反转
+ *
+ * 你这台车低占空比不容易起转，所以默认给得比较高。
  */
-#define TURN_INNER_SPEED         -70
+#define TURN_INNER_SPEED         -80
 #define TURN_OUTER_SPEED         100
-
-/*
- * 触发一次左/右转后，固定维持该动作这么久。
- * 你现在要求先试 2 s，所以设为 2000 ms。
- *
- * 实车 90°弯通常 2 s 会偏长，后续可直接改成
- * 150~500 ms 一档一档测试。
- */
-#define TURN_HOLD_MS            2000
 
 #endif
