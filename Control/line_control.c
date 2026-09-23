@@ -3,26 +3,11 @@
 #include "tracking.h"
 #include "line_control.h"
 
-/*
- * 直接按上传开源例程的循迹判断改写：
- *
- *   HWSM_R==0 && HWSM_L==0 -> 直行
- *   HWSM_R==1 && HWSM_L==0 -> 右转
- *   HWSM_L==1 && HWSM_R==0 -> 左转
- *   else                    -> 直行
- *
- * 对应你的实车：
- *   灯亮 = 0
- *   灯灭 = 1
- *
- * 因此：
- *   00 两灯亮 -> 直行
- *   01 右灯灭 -> 右转
- *   10 左灯灭 -> 左转
- *   11 两灯灭 -> 直行
- *
- * 不加 PID、不加延时、不加历史方向、不加状态机。
- */
+#define LAST_NONE   0
+#define LAST_LEFT   1
+#define LAST_RIGHT  2
+
+static unsigned char g_last_turn = LAST_NONE;
 
 static void run_forward(void)
 {
@@ -43,6 +28,7 @@ static void turn_right(void)
 
 void line_control_init(void)
 {
+    g_last_turn = LAST_NONE;
     motor_stop();
 }
 
@@ -52,27 +38,49 @@ void line_control_step(void)
 
     pattern = tracking_read_pattern();
 
-    if (pattern == TRACK_PATTERN_BOTH_WHITE)
+    /*
+     * 当前实车：
+     *   11 = 两灯灭 = 黑线位于正常循迹位置
+     *   10 = 左侧检测黑线
+     *   01 = 右侧检测黑线
+     *   00 = 两侧都没有检测到黑线
+     */
+
+    if (pattern == TRACK_PATTERN_BOTH_BLACK)
     {
-        /* 00：两灯亮，黑线位于两个探头之间 */
+        /* 11：正常居中，直行 */
         run_forward();
-    }
-    else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
-    {
-        /* 01：右灯灭 -> 右转 */
-        turn_right();
     }
     else if (pattern == TRACK_PATTERN_LEFT_BLACK)
     {
-        /* 10：左灯灭 -> 左转 */
+        /* 10：向左修正 */
+        g_last_turn = LAST_LEFT;
         turn_left();
+    }
+    else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
+    {
+        /* 01：向右修正 */
+        g_last_turn = LAST_RIGHT;
+        turn_right();
     }
     else
     {
         /*
-         * 11：两灯都灭。
-         * 上传例程这里直接保持正转，因此这里也直接直行。
+         * 00：丢线。
+         * 按刚才的修正方向继续找线，不增加延时或状态机。
          */
-        run_forward();
+        if (g_last_turn == LAST_LEFT)
+        {
+            turn_left();
+        }
+        else if (g_last_turn == LAST_RIGHT)
+        {
+            turn_right();
+        }
+        else
+        {
+            /* 上电后还没有方向信息时先停住 */
+            motor_stop();
+        }
     }
 }
