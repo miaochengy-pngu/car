@@ -4,22 +4,24 @@
 #include "line_control.h"
 
 /*
- * 这里直接照公开 STC89C52RC 双红外循迹例程的控制结构改写。
+ * 直接按上传开源例程的循迹判断改写：
  *
- * 原例程 main.c 的核心就是：
+ *   HWSM_R==0 && HWSM_L==0 -> 直行
+ *   HWSM_R==1 && HWSM_L==0 -> 右转
+ *   HWSM_L==1 && HWSM_R==0 -> 左转
+ *   else                    -> 直行
  *
- *   00 -> run()
- *   10 -> leftrun()
- *   01 -> rightrun()
+ * 对应你的实车：
+ *   灯亮 = 0
+ *   灯灭 = 1
  *
- * leftrun():
- *   左轮后退，右轮前进
+ * 因此：
+ *   00 两灯亮 -> 直行
+ *   01 右灯灭 -> 右转
+ *   10 左灯灭 -> 左转
+ *   11 两灯灭 -> 直行
  *
- * rightrun():
- *   左轮前进，右轮后退
- *
- * 原例程没有 PID、没有滤波、没有延时锁定、没有状态机。
- * 11 时也没有新的电机赋值，因此自然保持上一条命令。
+ * 不加 PID、不加延时、不加历史方向、不加状态机。
  */
 
 static void run_forward(void)
@@ -27,13 +29,15 @@ static void run_forward(void)
     motor_set(RUN_LEFT_SPEED, RUN_RIGHT_SPEED);
 }
 
-static void left_run(void)
+static void turn_left(void)
 {
+    /* 左轮反转，右轮正转 */
     motor_set(TURN_INNER_SPEED, TURN_OUTER_SPEED);
 }
 
-static void right_run(void)
+static void turn_right(void)
 {
+    /* 左轮正转，右轮反转 */
     motor_set(TURN_OUTER_SPEED, TURN_INNER_SPEED);
 }
 
@@ -48,26 +52,27 @@ void line_control_step(void)
 
     pattern = tracking_read_pattern();
 
-    /* 两灯亮：黑线在两个探头之间，直行 */
     if (pattern == TRACK_PATTERN_BOTH_WHITE)
     {
+        /* 00：两灯亮，黑线位于两个探头之间 */
         run_forward();
     }
-    /* 左灯灭、右灯亮：左边碰到黑线，原地左转 */
-    else if (pattern == TRACK_PATTERN_LEFT_BLACK)
-    {
-        left_run();
-    }
-    /* 左灯亮、右灯灭：右边碰到黑线，原地右转 */
     else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
     {
-        right_run();
+        /* 01：右灯灭 -> 右转 */
+        turn_right();
+    }
+    else if (pattern == TRACK_PATTERN_LEFT_BLACK)
+    {
+        /* 10：左灯灭 -> 左转 */
+        turn_left();
     }
     else
     {
         /*
-         * 11：和所参考的开源“循迹小车实验3”一致，
-         * 不发送新的电机命令，保持上一动作。
+         * 11：两灯都灭。
+         * 上传例程这里直接保持正转，因此这里也直接直行。
          */
+        run_forward();
     }
 }
