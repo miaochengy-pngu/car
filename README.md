@@ -1,29 +1,25 @@
 # STC89C52RC 红外循迹小车
 
-当前版本按“简单验收”整理，不再做复杂竞赛状态机。
-
-验收重点：
+当前版本专门按课程验收整理：
 
 - 完成时间
 - 循迹精度（是否压线）
-- 稳定性（是否频繁左右震荡）
+- 稳定性（是否频繁震荡）
 - 每组重复 2 轮取平均
 
-因此控制器采用：
+不再使用 PID。当前控制器是更适合“双路数字红外”的三档差速闭环：
 
 ```text
 双路红外
    ↓
-离散误差
+居中 / 左偏 / 右偏
    ↓
-PD
+直行 / 柔和差速 / 强差速
    ↓
-左右 PWM 差速
+左右 PWM
    ↓
 L298N
 ```
-
-其中 PID 模块仍保留完整 P/I/D，但默认 `Ki=0`，实际先按 PD 使用。
 
 ## 工程结构
 
@@ -36,10 +32,6 @@ car/
 ├─ Control/
 │  ├─ line_control.c
 │  └─ line_control.h
-├─ Algorithm/
-│  └─ PID/
-│     ├─ pid.c
-│     └─ pid.h
 ├─ Hardware/
 │  ├─ Motor/
 │  │  ├─ motor.c
@@ -56,24 +48,18 @@ car/
    └─ delay.h
 ```
 
-双击：
+双击 `Project/car.uvproj` 打开 Keil 工程。
 
-```text
-Project/car.uvproj
-```
+## 红外状态
 
-即可打开 Keil C51 工程。
-
-## 当前控制逻辑
-
-红外模块：
+模块逻辑：
 
 ```text
 白底 -> 0 -> 指示灯亮
 黑线 -> 1 -> 指示灯灭
 ```
 
-两路状态编码：
+编码：
 
 ```text
 00 = 两个探头都白
@@ -82,95 +68,180 @@ Project/car.uvproj
 11 = 两个探头都黑
 ```
 
-默认按 3 cm 黑线，先设置：
+当前默认：
 
 ```c
 #define TRACK_CENTER_PATTERN 3
 ```
 
-即正常居中时为 `11`。
+即居中时为 `11`。
 
-如果你把车摆在线中央时发现两个循迹指示灯都是亮的，说明实际居中是 `00`，只需把：
-
-```c
-#define TRACK_CENTER_PATTERN 3
-```
-
-改成：
+如果实车居中时两个循迹指示灯都是亮的，则改成：
 
 ```c
 #define TRACK_CENTER_PATTERN 0
 ```
 
-不需要改其他代码。
+## 三档差速
 
-## PD 差速
-
-有效误差：
-
-```text
-10 -> error = -100 -> 向左修正
-居中 -> error = 0
-01 -> error = +100 -> 向右修正
-```
-
-控制器：
-
-```text
-correction = Kp * error + Kd * (error - last_error)
-
-left_pwm  = base_speed + correction
-right_pwm = base_speed - correction
-```
-
-偏线时使用较低基础速度，直线使用较高基础速度。
-
-## 当前初始参数
-
-全部集中在：
-
-```text
-System/config.h
-```
-
-当前值：
+参数全部在 `System/config.h`：
 
 ```c
-#define STEER_KP_X100           22
-#define STEER_KI_X100            0
-#define STEER_KD_X100           12
+#define SPEED_STRAIGHT            72
 
-#define SPEED_STRAIGHT           72
-#define SPEED_TURN               58
+#define TURN_SOFT_INNER           56
+#define TURN_SOFT_OUTER           80
 
-#define RECOVER_INNER_SPEED      24
-#define RECOVER_OUTER_SPEED      52
+#define TURN_HARD_INNER           36
+#define TURN_HARD_OUTER           84
+
+#define HARD_TURN_COUNT            4
+
+#define RECOVER_INNER_SPEED       24
+#define RECOVER_OUTER_SPEED       52
 ```
 
-解释：
-
-- `SPEED_STRAIGHT`：直接影响完成时间。
-- `Kp`：越大，偏线后拉回越快。
-- `Kd`：主要抑制左右来回震荡。
-- `SPEED_TURN`：弯道速度，太高容易压线。
-- `Ki=0`：当前验收不需要积分。
-
-## 建议调参顺序
-
-先保证能稳定跑完整圈，再提速。
-
-推荐顺序：
+控制逻辑：
 
 ```text
-1. SPEED_STRAIGHT = 60~65，先验证稳定
-2. 调 Kp，让偏线后能及时回来
-3. 调 Kd，把蛇形震荡压下去
-4. SPEED_STRAIGHT 提到 70、75、80...
-5. 每个参数组合跑 2 轮，记录平均时间
-6. 一旦开始明显压线/震荡，就退回上一档
+居中：
+72 / 72
+
+刚左偏：
+56 / 80
+
+连续左偏约 20 ms：
+36 / 84
+
+刚右偏：
+80 / 56
+
+连续右偏约 20 ms：
+84 / 36
 ```
 
-不要一开始追求最高 PWM。两轮取平均时，“稍慢但稳定”的参数通常比“一轮很快、一轮跑飞”更划算。
+所以它仍然是闭环控制，只是不使用 PID。
+
+## 调参原则
+
+第一次先以“稳定完整跑完”为目标，不追求最快。
+
+### 1. 先调直线速度
+
+只改：
+
+```c
+SPEED_STRAIGHT
+```
+
+建议顺序：
+
+```text
+64 -> 68 -> 72 -> 76 -> 80
+```
+
+每组都跑 2 轮并记录平均时间。
+
+如果直线开始明显蛇形或进弯来不及修正，就退回上一档。
+
+### 2. 如果左右摆动很频繁
+
+说明柔和修正太猛。
+
+把：
+
+```text
+56 / 80
+```
+
+收窄，例如：
+
+```text
+60 / 76
+```
+
+即提高 `TURN_SOFT_INNER`、降低 `TURN_SOFT_OUTER`。
+
+### 3. 如果弯道容易压线
+
+说明持续偏离后的修正不够。
+
+优先把强修正加大，例如：
+
+```text
+36 / 84
+-> 32 / 88
+-> 28 / 92
+```
+
+不要先把柔和修正也调得很猛，否则直线容易蛇形。
+
+### 4. 如果转弯反应太慢
+
+先减小：
+
+```c
+HARD_TURN_COUNT
+```
+
+例如：
+
+```text
+4 -> 3
+```
+
+控制周期约 5 ms，所以 4 次约 20 ms，3 次约 15 ms。
+
+### 5. 如果一碰线就突然猛转
+
+把：
+
+```c
+HARD_TURN_COUNT
+```
+
+增大，例如：
+
+```text
+4 -> 5 -> 6
+```
+
+让柔和修正持续更久。
+
+### 6. 如果彻底冲出线后回不来
+
+再调：
+
+```c
+RECOVER_INNER_SPEED
+RECOVER_OUTER_SPEED
+```
+
+先保持外轮 52 左右，只逐步降低内轮，例如：
+
+```text
+24 / 52
+20 / 52
+16 / 52
+```
+
+让找线转向更强。
+
+## 推荐验收调参记录
+
+每次只改一组参数，并记录：
+
+```text
+参数组
+第 1 轮时间
+第 2 轮时间
+平均时间
+是否压线
+是否明显震荡
+是否丢线
+```
+
+这样最终选择的是“两轮平均最好且稳定”的参数，而不是单圈偶然最快的参数。
 
 ## PWM
 
@@ -178,13 +249,13 @@ Timer0 软件 PWM：
 
 ```text
 PWM 频率约 200 Hz
-控制器更新频率约 200 Hz
+控制更新约 200 Hz
 PWM 分辨率约 4%
 ```
 
-ENA / ENB 独立控制左右轮速度。
+因此速度参数最好优先使用 4 的倍数。
 
-## 硬件接线
+## 接线
 
 ### L298N
 
@@ -215,21 +286,3 @@ OTR -> P3.4
 GND -> GND
 VCC -> VCC
 ```
-
-## 当前版本原则
-
-不做：
-
-- 自动中心识别
-- 复杂环岛/路口状态机
-- 多级速度规划
-- 假的编码器速度 PID
-
-只保留验收真正有用的：
-
-- PD
-- PWM
-- 差速
-- 一个简单的丢线按上一方向找回
-
-这样更适合这次课程验收。
