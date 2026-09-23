@@ -7,21 +7,19 @@
 void main(void)
 {
     tracking_init();
-    pwm_init();
     motor_init();
+    pwm_init();
     line_control_init();
 
-    /* 上电稳定 */
     delay_ms(300);
 
-    pwm_clear_control_tick();
-
+    /*
+     * 参考 STC89C52RC 开源循迹例程：
+     * while(1) 只轮询传感器、修改左右目标占空比。
+     * PWM 波形本身由 Timer0 中断独立产生。
+     */
     while (1)
     {
-        if (pwm_control_tick_ready())
-        {
-            pwm_clear_control_tick();
-            line_control_step();
-        }
+        line_control_step();
     }
 }
