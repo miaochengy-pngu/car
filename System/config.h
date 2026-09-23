@@ -2,21 +2,26 @@
 #define __CAR_CONFIG_H__
 
 /*
- * 下面只保留开源例程真正需要的三个动作参数。
+ * 这一版直接按用户上传的
+ * “51循迹小车（利用定时器间断测距）/循迹小车 - 2/main.c”
+ * 的核心循迹逻辑适配 A11 主板。
  *
- * 开源例程原始做法：
- *   00 -> run()
- *   10 -> leftrun()
- *   01 -> rightrun()
- *   11 -> 不执行新动作，保持上一条电机命令
+ * 原例程：
+ *   00 -> 直行
+ *   01 -> 右转（右轮反转、左轮正转）
+ *   10 -> 左转（左轮反转、右轮正转）
+ *   11 -> 直行
  *
- * 原例程的占空比较低；你的实车低占空比起不来，
- * 所以只把占空比按实车提高，控制逻辑不改。
+ * 原例程 PWM 很低，但你的实车已经确认低占空比电机起不来，
+ * 所以这里只保留它的控制逻辑，速度按实车提高。
  */
-#define RUN_LEFT_SPEED          90
-#define RUN_RIGHT_SPEED         90
 
-#define TURN_INNER_SPEED      -100
-#define TURN_OUTER_SPEED       100
+/* 直行左右轮可独立调，用于补偿电机差异 */
+#define RUN_LEFT_SPEED           90
+#define RUN_RIGHT_SPEED          90
+
+/* 强转：内轮反转，外轮正转 */
+#define TURN_INNER_SPEED       -100
+#define TURN_OUTER_SPEED        100
 
 #endif
