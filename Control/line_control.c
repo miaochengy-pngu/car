@@ -3,11 +3,18 @@
 #include "tracking.h"
 #include "line_control.h"
 
-#define LAST_NONE   0
-#define LAST_LEFT   1
-#define LAST_RIGHT  2
-
-static unsigned char g_last_turn = LAST_NONE;
+/*
+ * 最简单的双数字红外循迹逻辑：
+ *
+ *   两个传感器相同（00 或 11） -> 直行
+ *   10 -> 左转
+ *   01 -> 右转
+ *
+ * 这样不依赖指示灯极性来决定“中心到底是 00 还是 11”。
+ * 只要左右不一致，就按哪一侧检测到黑线来修正。
+ *
+ * 不使用 PID、延时、状态机或历史方向。
+ */
 
 static void run_forward(void)
 {
@@ -28,7 +35,6 @@ static void turn_right(void)
 
 void line_control_init(void)
 {
-    g_last_turn = LAST_NONE;
     motor_stop();
 }
 
@@ -38,49 +44,20 @@ void line_control_step(void)
 
     pattern = tracking_read_pattern();
 
-    /*
-     * 当前实车：
-     *   11 = 两灯灭 = 黑线位于正常循迹位置
-     *   10 = 左侧检测黑线
-     *   01 = 右侧检测黑线
-     *   00 = 两侧都没有检测到黑线
-     */
-
-    if (pattern == TRACK_PATTERN_BOTH_BLACK)
+    if ((pattern == TRACK_PATTERN_BOTH_WHITE) ||
+        (pattern == TRACK_PATTERN_BOTH_BLACK))
     {
-        /* 11：正常居中，直行 */
+        /* 00 或 11：左右状态相同，继续向前 */
         run_forward();
     }
     else if (pattern == TRACK_PATTERN_LEFT_BLACK)
     {
-        /* 10：向左修正 */
-        g_last_turn = LAST_LEFT;
+        /* 10：左侧检测到黑线 -> 左转 */
         turn_left();
-    }
-    else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
-    {
-        /* 01：向右修正 */
-        g_last_turn = LAST_RIGHT;
-        turn_right();
     }
     else
     {
-        /*
-         * 00：丢线。
-         * 按刚才的修正方向继续找线，不增加延时或状态机。
-         */
-        if (g_last_turn == LAST_LEFT)
-        {
-            turn_left();
-        }
-        else if (g_last_turn == LAST_RIGHT)
-        {
-            turn_right();
-        }
-        else
-        {
-            /* 上电后还没有方向信息时先停住 */
-            motor_stop();
-        }
+        /* 01：右侧检测到黑线 -> 右转 */
+        turn_right();
     }
 }
