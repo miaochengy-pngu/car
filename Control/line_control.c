@@ -1,65 +1,73 @@
 #include "config.h"
-#include "pid.h"
 #include "motor.h"
 #include "tracking.h"
 #include "line_control.h"
 
-static PID_Controller g_pd;
-static int g_last_error = 0;
+/*
+ * direction:
+ *   -1 = 最近一次需要向左修正
+ *    0 = 尚无历史方向
+ *   +1 = 最近一次需要向右修正
+ */
+static signed char g_last_direction = 0;
 
-static int clamp_int(int value, int min_value, int max_value)
+/* 连续保持同一偏离方向的控制周期数 */
+static unsigned char g_deviation_count = 0;
+
+static void drive_left(unsigned char strong)
 {
-    if (value < min_value)
+    if (strong)
     {
-        return min_value;
+        motor_set(TURN_HARD_INNER, TURN_HARD_OUTER);
     }
-
-    if (value > max_value)
+    else
     {
-        return max_value;
+        motor_set(TURN_SOFT_INNER, TURN_SOFT_OUTER);
     }
-
-    return value;
 }
 
-/*
- * 两路数字红外只提供三档有效误差：
- *
- *   10 -> 黑线偏左 -> 小车向左修正 -> error = -100
- *   居中状态        -> error = 0
- *   01 -> 黑线偏右 -> 小车向右修正 -> error = +100
- */
-static int pattern_to_error(unsigned char pattern)
+static void drive_right(unsigned char strong)
 {
-    if (pattern == TRACK_PATTERN_LEFT_BLACK)
+    if (strong)
     {
-        return -TRACK_ERROR;
+        motor_set(TURN_HARD_OUTER, TURN_HARD_INNER);
     }
-
-    if (pattern == TRACK_PATTERN_RIGHT_BLACK)
+    else
     {
-        return TRACK_ERROR;
+        motor_set(TURN_SOFT_OUTER, TURN_SOFT_INNER);
     }
+}
 
-    return 0;
+static void update_deviation(signed char direction)
+{
+    if (g_last_direction == direction)
+    {
+        if (g_deviation_count < 255)
+        {
+            g_deviation_count++;
+        }
+    }
+    else
+    {
+        g_last_direction = direction;
+        g_deviation_count = 1;
+    }
 }
 
 static void recover_line(void)
 {
     /*
-     * 特殊状态 = 与 TRACK_CENTER_PATTERN 相反的全白/全黑状态。
-     * 不做复杂状态机，只按上一次偏移方向低速找线。
+     * 不做复杂状态机。
+     * 完全丢线时只按照最近一次修正方向继续低速找线。
      */
-    pid_reset(&g_pd);
+    g_deviation_count = 0;
 
-    if (g_last_error < 0)
+    if (g_last_direction < 0)
     {
-        /* 向左找：左轮慢、右轮快 */
         motor_set(RECOVER_INNER_SPEED, RECOVER_OUTER_SPEED);
     }
-    else if (g_last_error > 0)
+    else if (g_last_direction > 0)
     {
-        /* 向右找：左轮快、右轮慢 */
         motor_set(RECOVER_OUTER_SPEED, RECOVER_INNER_SPEED);
     }
     else
@@ -70,14 +78,8 @@ static void recover_line(void)
 
 void line_control_init(void)
 {
-    pid_init(&g_pd,
-             STEER_KP_X100,
-             STEER_KI_X100,
-             STEER_KD_X100,
-             STEER_INTEGRAL_LIMIT,
-             STEER_OUTPUT_LIMIT);
-
-    g_last_error = 0;
+    g_last_direction = 0;
+    g_deviation_count = 0;
     motor_stop();
 }
 
@@ -85,12 +87,7 @@ void line_control_step(void)
 {
     unsigned char pattern;
     unsigned char opposite_pattern;
-
-    int error;
-    int correction;
-    int base_speed;
-    int left_speed;
-    int right_speed;
+    unsigned char strong_turn;
 
     pattern = tracking_read_pattern();
 
@@ -100,39 +97,40 @@ void line_control_step(void)
     opposite_pattern = TRACK_PATTERN_BOTH_BLACK;
 #endif
 
+    /* 正常居中：高速直行，并清空“持续偏离”计数。 */
+    if (pattern == TRACK_CENTER_PATTERN)
+    {
+        g_deviation_count = 0;
+        motor_set(SPEED_STRAIGHT, SPEED_STRAIGHT);
+        return;
+    }
+
+    /* 完全丢线/特殊状态：按上一次方向低速找回。 */
     if (pattern == opposite_pattern)
     {
         recover_line();
         return;
     }
 
-    if (pattern == TRACK_CENTER_PATTERN)
-    {
-        error = 0;
-        base_speed = SPEED_STRAIGHT;
-    }
-    else
-    {
-        error = pattern_to_error(pattern);
-        base_speed = SPEED_TURN;
-
-        if (error != 0)
-        {
-            g_last_error = error;
-        }
-    }
-
-    correction = pid_update(&g_pd, error);
-
     /*
-     * correction > 0：向右修正
-     * correction < 0：向左修正
+     * 10：黑线更靠左 -> 小车向左修正
+     * 01：黑线更靠右 -> 小车向右修正
      */
-    left_speed  = base_speed + correction;
-    right_speed = base_speed - correction;
+    if (pattern == TRACK_PATTERN_LEFT_BLACK)
+    {
+        update_deviation(-1);
+        strong_turn = (g_deviation_count >= HARD_TURN_COUNT) ? 1 : 0;
+        drive_left(strong_turn);
+        return;
+    }
 
-    left_speed  = clamp_int(left_speed, 0, 100);
-    right_speed = clamp_int(right_speed, 0, 100);
+    if (pattern == TRACK_PATTERN_RIGHT_BLACK)
+    {
+        update_deviation(1);
+        strong_turn = (g_deviation_count >= HARD_TURN_COUNT) ? 1 : 0;
+        drive_right(strong_turn);
+        return;
+    }
 
-    motor_set(left_speed, right_speed);
+    motor_stop();
 }
