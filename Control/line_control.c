@@ -4,9 +4,6 @@
 #include "line_control.h"
 
 /*
- * 和常见 STC89C52RC 双红外循迹例程一样：
- * 主循环不断读传感器，直接更新左右轮目标 PWM。
- *
  * last_direction:
  *   -1 = 上一次向左修正
  *    0 = 尚未出现偏离
@@ -62,37 +59,27 @@ void line_control_step(void)
 #endif
 
     /*
-     * 居中：左右同速。
+     * 居中：左右轮使用独立的基础 PWM。
+     * 这是没有编码器时补偿左右电机差异的最直接办法。
      */
     if (pattern == TRACK_CENTER_PATTERN)
     {
-        motor_set(SPEED_STRAIGHT, SPEED_STRAIGHT);
+        motor_set(SPEED_STRAIGHT_LEFT, SPEED_STRAIGHT_RIGHT);
         return;
     }
 
-    /*
-     * 左探头碰到黑线：左轮减速、右轮加速。
-     */
     if (pattern == TRACK_PATTERN_LEFT_BLACK)
     {
         turn_left();
         return;
     }
 
-    /*
-     * 右探头碰到黑线：右轮减速、左轮加速。
-     */
     if (pattern == TRACK_PATTERN_RIGHT_BLACK)
     {
         turn_right();
         return;
     }
 
-    /*
-     * 两个探头进入与“居中”相反的状态：
-     * 对 90°直角，可能是拐角处短暂全黑/全白。
-     * 按刚才的转向方向继续找线。
-     */
     if (pattern == opposite_pattern)
     {
         recover_line();
