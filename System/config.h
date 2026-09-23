@@ -11,47 +11,45 @@
  */
 
 /* 手册确认：白底=0，黑线=1 */
-#define TRACK_BLACK_LEVEL       1
+#define TRACK_BLACK_LEVEL          1
 
 /*
  * 两个探头“居中”时的状态：
  * 3 = 11：两个探头都在黑线上
  * 0 = 00：黑线位于两个探头之间
  *
- * 3 cm 黑线默认先用 11。
- * 如果实车居中时两个指示灯都是亮的，把 3 改成 0。
+ * 当前先按 3 cm 黑线使用 11。
+ * 如果实车居中时两个循迹指示灯都是亮的，把 3 改成 0。
  */
-#define TRACK_CENTER_PATTERN    3
-
-/* 离散误差幅值 */
-#define TRACK_ERROR             100
+#define TRACK_CENTER_PATTERN       3
 
 /*
- * PD 参数，数值放大 100 倍保存：
- * Kp = 0.22
- * Ki = 0
- * Kd = 0.12
+ * 三档差速参数，单位都是 PWM 百分比。
  *
- * PID 模块保留完整 I 项，但本次简单验收先不用积分。
+ * 直线：左右同速。
+ * 刚偏线：柔和差速，避免一碰线就猛打方向导致蛇形。
+ * 持续偏线：增大差速，避免弯道来不及修正而压线。
+ *
+ * 当前 PWM 分辨率约 4%，所以参数尽量取 4 的倍数。
  */
-#define STEER_KP_X100           22
-#define STEER_KI_X100            0
-#define STEER_KD_X100           12
+#define SPEED_STRAIGHT            72
 
-#define STEER_INTEGRAL_LIMIT   300
-#define STEER_OUTPUT_LIMIT      38
+#define TURN_SOFT_INNER           56
+#define TURN_SOFT_OUTER           80
+
+#define TURN_HARD_INNER           36
+#define TURN_HARD_OUTER           84
 
 /*
- * PWM 百分比。
- * 直线较快，检测到偏线时自动降一点速度。
+ * 控制器约 200 Hz，即每次约 5 ms。
+ * 同一方向连续偏离达到 4 次（约 20 ms）后切换为强修正。
  */
-#define SPEED_STRAIGHT           72
-#define SPEED_TURN               58
+#define HARD_TURN_COUNT            4
 
 /*
  * 完全丢线/特殊状态时，按最近一次偏移方向低速找回。
  */
-#define RECOVER_INNER_SPEED      24
-#define RECOVER_OUTER_SPEED      52
+#define RECOVER_INNER_SPEED       24
+#define RECOVER_OUTER_SPEED       52
 
 #endif
