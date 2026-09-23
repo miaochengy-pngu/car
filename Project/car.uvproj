@@ -272,7 +272,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Algorithm\PID;..\Control</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Control</IncludePath>
             </VariousControls>
           </C51>
 
@@ -285,7 +285,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Algorithm\PID;..\Control</IncludePath>
+              <IncludePath>..\System;..\Hardware\Motor;..\Hardware\Tracking;..\Hardware\PWM;..\Control</IncludePath>
             </VariousControls>
           </Ax51>
 
@@ -351,21 +351,7 @@
           </Files>
         </Group>
 
-        <Group>
-          <GroupName>ALGORITHM</GroupName>
-          <Files>
-            <File>
-              <FileName>pid.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Algorithm\PID\pid.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Algorithm\PID\pid.h</FilePath>
-            </File>
-          </Files>
-        </Group>
+
 
         <Group>
           <GroupName>HARDWARE</GroupName>
