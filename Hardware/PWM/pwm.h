@@ -10,4 +10,10 @@ void pwm_set_left(unsigned char duty);
 void pwm_set_right(unsigned char duty);
 void pwm_set_both(unsigned char left_duty, unsigned char right_duty);
 
+/*
+ * Timer0 约每 1 ms 自增一次。
+ * 返回 8 位毫秒计数（0~255 循环），用于短时间非阻塞状态机。
+ */
+unsigned char pwm_millis8(void);
+
 #endif
