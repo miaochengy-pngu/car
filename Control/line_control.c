@@ -4,64 +4,30 @@
 #include "line_control.h"
 
 /*
- * direction:
- *   -1 = 最近一次需要向左修正
- *    0 = 尚无历史方向
- *   +1 = 最近一次需要向右修正
+ * 和常见 STC89C52RC 双红外循迹例程一样：
+ * 主循环不断读传感器，直接更新左右轮目标 PWM。
+ *
+ * last_direction:
+ *   -1 = 上一次向左修正
+ *    0 = 尚未出现偏离
+ *   +1 = 上一次向右修正
  */
 static signed char g_last_direction = 0;
 
-/* 连续保持同一偏离方向的控制周期数 */
-static unsigned char g_deviation_count = 0;
-
-static void drive_left(unsigned char strong)
+static void turn_left(void)
 {
-    if (strong)
-    {
-        motor_set(TURN_HARD_INNER, TURN_HARD_OUTER);
-    }
-    else
-    {
-        motor_set(TURN_SOFT_INNER, TURN_SOFT_OUTER);
-    }
+    g_last_direction = -1;
+    motor_set(TURN_INNER_SPEED, TURN_OUTER_SPEED);
 }
 
-static void drive_right(unsigned char strong)
+static void turn_right(void)
 {
-    if (strong)
-    {
-        motor_set(TURN_HARD_OUTER, TURN_HARD_INNER);
-    }
-    else
-    {
-        motor_set(TURN_SOFT_OUTER, TURN_SOFT_INNER);
-    }
-}
-
-static void update_deviation(signed char direction)
-{
-    if (g_last_direction == direction)
-    {
-        if (g_deviation_count < 255)
-        {
-            g_deviation_count++;
-        }
-    }
-    else
-    {
-        g_last_direction = direction;
-        g_deviation_count = 1;
-    }
+    g_last_direction = 1;
+    motor_set(TURN_OUTER_SPEED, TURN_INNER_SPEED);
 }
 
 static void recover_line(void)
 {
-    /*
-     * 不做复杂状态机。
-     * 完全丢线时只按照最近一次修正方向继续低速找线。
-     */
-    g_deviation_count = 0;
-
     if (g_last_direction < 0)
     {
         motor_set(RECOVER_INNER_SPEED, RECOVER_OUTER_SPEED);
@@ -79,7 +45,6 @@ static void recover_line(void)
 void line_control_init(void)
 {
     g_last_direction = 0;
-    g_deviation_count = 0;
     motor_stop();
 }
 
@@ -87,48 +52,50 @@ void line_control_step(void)
 {
     unsigned char pattern;
     unsigned char opposite_pattern;
-    unsigned char strong_turn;
 
     pattern = tracking_read_pattern();
 
-#if TRACK_CENTER_PATTERN == 3
-    opposite_pattern = TRACK_PATTERN_BOTH_WHITE;
-#else
+#if TRACK_CENTER_PATTERN == 0
     opposite_pattern = TRACK_PATTERN_BOTH_BLACK;
+#else
+    opposite_pattern = TRACK_PATTERN_BOTH_WHITE;
 #endif
 
-    /* 正常居中：高速直行，并清空“持续偏离”计数。 */
+    /*
+     * 居中：左右同速。
+     */
     if (pattern == TRACK_CENTER_PATTERN)
     {
-        g_deviation_count = 0;
         motor_set(SPEED_STRAIGHT, SPEED_STRAIGHT);
         return;
     }
 
-    /* 完全丢线/特殊状态：按上一次方向低速找回。 */
-    if (pattern == opposite_pattern)
+    /*
+     * 左探头碰到黑线：左轮减速、右轮加速。
+     */
+    if (pattern == TRACK_PATTERN_LEFT_BLACK)
     {
-        recover_line();
+        turn_left();
         return;
     }
 
     /*
-     * 10：黑线更靠左 -> 小车向左修正
-     * 01：黑线更靠右 -> 小车向右修正
+     * 右探头碰到黑线：右轮减速、左轮加速。
      */
-    if (pattern == TRACK_PATTERN_LEFT_BLACK)
+    if (pattern == TRACK_PATTERN_RIGHT_BLACK)
     {
-        update_deviation(-1);
-        strong_turn = (g_deviation_count >= HARD_TURN_COUNT) ? 1 : 0;
-        drive_left(strong_turn);
+        turn_right();
         return;
     }
 
-    if (pattern == TRACK_PATTERN_RIGHT_BLACK)
+    /*
+     * 两个探头进入与“居中”相反的状态：
+     * 对 90°直角，可能是拐角处短暂全黑/全白。
+     * 按刚才的转向方向继续找线。
+     */
+    if (pattern == opposite_pattern)
     {
-        update_deviation(1);
-        strong_turn = (g_deviation_count >= HARD_TURN_COUNT) ? 1 : 0;
-        drive_right(strong_turn);
+        recover_line();
         return;
     }
 
