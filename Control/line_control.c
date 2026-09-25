@@ -14,6 +14,10 @@
  *      |
  *      | 持续输出差速转弯
  *      v
+ * COOLDOWN_STATE
+ *      |
+ *      | 1s内禁止再次判断外侧转弯传感器
+ *      v
  * FOLLOW_LINE
  *
  * 黑线 = 1 (灯灭)
@@ -23,11 +27,13 @@ typedef enum
 {
     FOLLOW_LINE = 0,
     TURN_LEFT_STATE,
-    TURN_RIGHT_STATE
+    TURN_RIGHT_STATE,
+    TURN_COOLDOWN_STATE
 } CarState;
 
 static CarState state = FOLLOW_LINE;
 static unsigned int turn_count = 0;
+static unsigned int cooldown_count = 0;
 
 static void run_forward(void)
 {
@@ -73,6 +79,7 @@ void line_control_init(void)
     motor_stop();
     state = FOLLOW_LINE;
     turn_count = 0;
+    cooldown_count = 0;
 }
 
 void line_control_step(void)
@@ -99,26 +106,39 @@ void line_control_step(void)
 
         case TURN_LEFT_STATE:
 
-            /* 锁定左转，不再读取传感器 */
             turn_left();
             turn_count++;
 
             if (turn_count >= TURN_TIME_MS)
             {
                 turn_count = 0;
-                state = FOLLOW_LINE;
+                cooldown_count = 0;
+                state = TURN_COOLDOWN_STATE;
             }
             break;
 
         case TURN_RIGHT_STATE:
 
-            /* 锁定右转，不再读取传感器 */
             turn_right();
             turn_count++;
 
             if (turn_count >= TURN_TIME_MS)
             {
                 turn_count = 0;
+                cooldown_count = 0;
+                state = TURN_COOLDOWN_STATE;
+            }
+            break;
+
+        case TURN_COOLDOWN_STATE:
+
+            /* 转弯结束后继续前进，1秒内忽略外侧传感器 */
+            run_forward();
+            cooldown_count++;
+
+            if (cooldown_count >= TURN_TIME_MS)
+            {
+                cooldown_count = 0;
                 state = FOLLOW_LINE;
             }
             break;
