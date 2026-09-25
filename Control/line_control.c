@@ -4,21 +4,19 @@
 #include "line_control.h"
 
 /*
- * FSM:
+ * 四路红外循迹状态机：
  *
  * FOLLOW_LINE
  *      |
- *      | outer sensor detects black
+ *      | 外侧传感器检测黑线
  *      v
- * TURN_LEFT / TURN_RIGHT
+ * TURN_LEFT_STATE / TURN_RIGHT_STATE
  *      |
- *      | keep differential steering for TURN_TIME_MS cycles
+ *      | 持续输出差速转弯
  *      v
  * FOLLOW_LINE
  *
- * Sensor:
- * black line = 1
- * white = 0
+ * 黑线 = 1 (灯灭)
  */
 
 typedef enum
@@ -29,7 +27,7 @@ typedef enum
 } CarState;
 
 static CarState state = FOLLOW_LINE;
-static unsigned int turn_counter = 0;
+static unsigned int turn_count = 0;
 
 static void run_forward(void)
 {
@@ -38,14 +36,12 @@ static void run_forward(void)
 
 static void turn_left(void)
 {
-    /* left wheel reverse, right wheel forward */
-    motor_set(-100, 100);
+    motor_set(TURN_INNER_SPEED, TURN_OUTER_SPEED);
 }
 
 static void turn_right(void)
 {
-    /* left wheel forward, right wheel reverse */
-    motor_set(100, -100);
+    motor_set(TURN_OUTER_SPEED, TURN_INNER_SPEED);
 }
 
 static void follow_line(void)
@@ -54,17 +50,17 @@ static void follow_line(void)
 
     pattern = tracking_read_pattern();
 
-    if(pattern == TRACK_PATTERN_BOTH_BLACK)
+    if (pattern == TRACK_PATTERN_BOTH_BLACK)
     {
         run_forward();
     }
-    else if(pattern == TRACK_PATTERN_LEFT_BLACK)
+    else if (pattern == TRACK_PATTERN_LEFT_BLACK)
     {
-        motor_set(-60, 100);
+        turn_left();
     }
-    else if(pattern == TRACK_PATTERN_RIGHT_BLACK)
+    else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
     {
-        motor_set(100, -60);
+        turn_right();
     }
     else
     {
@@ -74,9 +70,9 @@ static void follow_line(void)
 
 void line_control_init(void)
 {
-    state = FOLLOW_LINE;
-    turn_counter = 0;
     motor_stop();
+    state = FOLLOW_LINE;
+    turn_count = 0;
 }
 
 void line_control_step(void)
@@ -85,48 +81,45 @@ void line_control_step(void)
     {
         case FOLLOW_LINE:
 
-            if(tracking_outer_left())
+            if (tracking_outer_left())
             {
                 state = TURN_LEFT_STATE;
-                turn_counter = 0;
-                break;
+                turn_count = 0;
             }
-
-            if(tracking_outer_right())
+            else if (tracking_outer_right())
             {
                 state = TURN_RIGHT_STATE;
-                turn_counter = 0;
-                break;
+                turn_count = 0;
             }
-
-            follow_line();
+            else
+            {
+                follow_line();
+            }
             break;
-
 
         case TURN_LEFT_STATE:
 
-            /* keep turning, ignore sensors */
+            /* 锁定左转，不再读取传感器 */
             turn_left();
-            turn_counter++;
+            turn_count++;
 
-            if(turn_counter >= TURN_TIME_MS)
+            if (turn_count >= TURN_TIME_MS)
             {
+                turn_count = 0;
                 state = FOLLOW_LINE;
-                turn_counter = 0;
             }
             break;
 
-
         case TURN_RIGHT_STATE:
 
-            /* keep turning, ignore sensors */
+            /* 锁定右转，不再读取传感器 */
             turn_right();
-            turn_counter++;
+            turn_count++;
 
-            if(turn_counter >= TURN_TIME_MS)
+            if (turn_count >= TURN_TIME_MS)
             {
+                turn_count = 0;
                 state = FOLLOW_LINE;
-                turn_counter = 0;
             }
             break;
     }
