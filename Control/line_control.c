@@ -5,9 +5,15 @@
 #include "delay.h"
 
 /*
- * 四路红外策略：
- * 外侧传感器 -> 90度转弯触发
- * 内侧传感器 -> 普通循迹
+ * 四路红外循迹：
+ *
+ * 外侧传感器：只负责90度转弯
+ *   外左检测黑线 -> 左转1秒
+ *   外右检测黑线 -> 右转1秒
+ *
+ * 内侧传感器：负责普通循迹
+ *   黑线 = 1
+ *   白底 = 0
  */
 
 static void run_forward(void)
@@ -28,10 +34,17 @@ static void turn_right(void)
 static void follow_line(void)
 {
     unsigned char pattern;
+
     pattern = tracking_read_pattern();
 
-    if ((pattern == TRACK_PATTERN_BOTH_WHITE) ||
-        (pattern == TRACK_PATTERN_BOTH_BLACK))
+    /*
+     * 内侧循迹：
+     * 11: 黑线位于中心 -> 直行
+     * 10: 左侧偏移 -> 左修正
+     * 01: 右侧偏移 -> 右修正
+     */
+
+    if (pattern == TRACK_PATTERN_BOTH_BLACK)
     {
         run_forward();
     }
@@ -39,9 +52,13 @@ static void follow_line(void)
     {
         turn_left();
     }
-    else
+    else if (pattern == TRACK_PATTERN_RIGHT_BLACK)
     {
         turn_right();
+    }
+    else
+    {
+        run_forward();
     }
 }
 
@@ -52,7 +69,7 @@ void line_control_init(void)
 
 void line_control_step(void)
 {
-    /* 外侧传感器优先处理90度弯 */
+    /* 外侧传感器优先：检测90度弯 */
     if (tracking_outer_left())
     {
         turn_left();
@@ -67,5 +84,6 @@ void line_control_step(void)
         return;
     }
 
+    /* 没有大弯，执行普通循迹 */
     follow_line();
 }
