@@ -2,25 +2,23 @@
 #include "motor.h"
 #include "tracking.h"
 #include "line_control.h"
+#include "timer.h"
 
 /*
- * 四路红外循迹状态机：
- *
+ * 状态机:
  * FOLLOW_LINE
  *      |
- *      | 外侧传感器检测黑线
+ *      | 外侧传感器触发
  *      v
- * TURN_LEFT_STATE / TURN_RIGHT_STATE
+ * TURN_LEFT / TURN_RIGHT
  *      |
- *      | 持续输出差速转弯
+ *      | Timer0计时
  *      v
- * COOLDOWN_STATE
+ * COOLDOWN
  *      |
- *      | 1s内禁止再次判断外侧转弯传感器
+ *      | Timer0计时
  *      v
  * FOLLOW_LINE
- *
- * 黑线 = 1 (灯灭)
  */
 
 typedef enum
@@ -32,8 +30,7 @@ typedef enum
 } CarState;
 
 static CarState state = FOLLOW_LINE;
-static unsigned int turn_count = 0;
-static unsigned int cooldown_count = 0;
+static unsigned int state_start_time = 0;
 
 static void run_forward(void)
 {
@@ -78,12 +75,14 @@ void line_control_init(void)
 {
     motor_stop();
     state = FOLLOW_LINE;
-    turn_count = 0;
-    cooldown_count = 0;
+    state_start_time = 0;
 }
 
 void line_control_step(void)
 {
+    unsigned int now;
+    now = timer0_get_ms();
+
     switch(state)
     {
         case FOLLOW_LINE:
@@ -91,12 +90,12 @@ void line_control_step(void)
             if (tracking_outer_left())
             {
                 state = TURN_LEFT_STATE;
-                turn_count = 0;
+                state_start_time = now;
             }
             else if (tracking_outer_right())
             {
                 state = TURN_RIGHT_STATE;
-                turn_count = 0;
+                state_start_time = now;
             }
             else
             {
@@ -107,38 +106,31 @@ void line_control_step(void)
         case TURN_LEFT_STATE:
 
             turn_left();
-            turn_count++;
 
-            if (turn_count >= TURN_TIME_MS)
+            if ((unsigned int)(now - state_start_time) >= TURN_DURATION_MS)
             {
-                turn_count = 0;
-                cooldown_count = 0;
                 state = TURN_COOLDOWN_STATE;
+                state_start_time = now;
             }
             break;
 
         case TURN_RIGHT_STATE:
 
             turn_right();
-            turn_count++;
 
-            if (turn_count >= TURN_TIME_MS)
+            if ((unsigned int)(now - state_start_time) >= TURN_DURATION_MS)
             {
-                turn_count = 0;
-                cooldown_count = 0;
                 state = TURN_COOLDOWN_STATE;
+                state_start_time = now;
             }
             break;
 
         case TURN_COOLDOWN_STATE:
 
-            /* 转弯结束后继续前进，1秒内忽略外侧传感器 */
             run_forward();
-            cooldown_count++;
 
-            if (cooldown_count >= TURN_TIME_MS)
+            if ((unsigned int)(now - state_start_time) >= COOLDOWN_DURATION_MS)
             {
-                cooldown_count = 0;
                 state = FOLLOW_LINE;
             }
             break;
