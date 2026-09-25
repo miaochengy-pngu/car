@@ -18,7 +18,11 @@
 #define TURN_INNER_SPEED       -100
 #define TURN_OUTER_SPEED        100
 
-/* 外侧传感器触发后的固定转弯时间 */
-#define TURN_TIME_MS           1000
+/*
+ * 转弯状态保持次数。
+ * line_control_step() 每次循环增加一次。
+ * 先保证转弯状态明显保持，再根据实车速度微调。
+ */
+#define TURN_TIME_MS           10000
 
 #endif
