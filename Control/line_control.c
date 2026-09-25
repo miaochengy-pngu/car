@@ -2,19 +2,28 @@
 #include "motor.h"
 #include "tracking.h"
 #include "line_control.h"
-#include "delay.h"
 
 /*
  * 四路红外循迹：
  *
- * 外侧传感器：只负责90度转弯
- *   外左检测黑线 -> 左转1秒
- *   外右检测黑线 -> 右转1秒
+ * 外侧传感器：90度弯触发
+ *   检测黑线(1) -> 进入固定转弯状态
  *
- * 内侧传感器：负责普通循迹
- *   黑线 = 1
- *   白底 = 0
+ * 内侧传感器：普通循迹
+ *
+ * 黑线 = 1
+ * 白底 = 0
  */
+
+typedef enum
+{
+    FOLLOW_LINE = 0,
+    TURN_LEFT_STATE,
+    TURN_RIGHT_STATE
+} CarState;
+
+static CarState state = FOLLOW_LINE;
+static unsigned int turn_count = 0;
 
 static void run_forward(void)
 {
@@ -23,11 +32,13 @@ static void run_forward(void)
 
 static void turn_left(void)
 {
+    /* 左轮反转，右轮正转 */
     motor_set(TURN_INNER_SPEED, TURN_OUTER_SPEED);
 }
 
 static void turn_right(void)
 {
+    /* 左轮正转，右轮反转 */
     motor_set(TURN_OUTER_SPEED, TURN_INNER_SPEED);
 }
 
@@ -36,13 +47,6 @@ static void follow_line(void)
     unsigned char pattern;
 
     pattern = tracking_read_pattern();
-
-    /*
-     * 内侧循迹：
-     * 11: 黑线位于中心 -> 直行
-     * 10: 左侧偏移 -> 左修正
-     * 01: 右侧偏移 -> 右修正
-     */
 
     if (pattern == TRACK_PATTERN_BOTH_BLACK)
     {
@@ -65,25 +69,55 @@ static void follow_line(void)
 void line_control_init(void)
 {
     motor_stop();
+    state = FOLLOW_LINE;
+    turn_count = 0;
 }
 
 void line_control_step(void)
 {
-    /* 外侧传感器优先：检测90度弯 */
-    if (tracking_outer_left())
+    switch(state)
     {
-        turn_left();
-        delay_ms(TURN_TIME_MS);
-        return;
-    }
+        case FOLLOW_LINE:
 
-    if (tracking_outer_right())
-    {
-        turn_right();
-        delay_ms(TURN_TIME_MS);
-        return;
-    }
+            /* 外侧传感器优先触发90度转弯 */
+            if (tracking_outer_left())
+            {
+                state = TURN_LEFT_STATE;
+                turn_count = 0;
+            }
+            else if (tracking_outer_right())
+            {
+                state = TURN_RIGHT_STATE;
+                turn_count = 0;
+            }
+            else
+            {
+                follow_line();
+            }
+            break;
 
-    /* 没有大弯，执行普通循迹 */
-    follow_line();
+
+        case TURN_LEFT_STATE:
+
+            turn_left();
+            turn_count++;
+
+            if (turn_count >= TURN_TIME_MS)
+            {
+                state = FOLLOW_LINE;
+            }
+            break;
+
+
+        case TURN_RIGHT_STATE:
+
+            turn_right();
+            turn_count++;
+
+            if (turn_count >= TURN_TIME_MS)
+            {
+                state = FOLLOW_LINE;
+            }
+            break;
+    }
 }
