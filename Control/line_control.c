@@ -14,10 +14,6 @@
  *      |
  *      | Timer0计时
  *      v
- * COOLDOWN
- *      |
- *      | Timer0计时
- *      v
  * FOLLOW_LINE
  */
 
@@ -25,8 +21,7 @@ typedef enum
 {
     FOLLOW_LINE = 0,
     TURN_LEFT_STATE,
-    TURN_RIGHT_STATE,
-    TURN_COOLDOWN_STATE
+    TURN_RIGHT_STATE
 } CarState;
 
 static CarState state = FOLLOW_LINE;
@@ -109,8 +104,7 @@ void line_control_step(void)
 
             if ((unsigned int)(now - state_start_time) >= TURN_DURATION_MS)
             {
-                state = TURN_COOLDOWN_STATE;
-                state_start_time = now;
+                state = FOLLOW_LINE;
             }
             break;
 
@@ -119,17 +113,6 @@ void line_control_step(void)
             turn_right();
 
             if ((unsigned int)(now - state_start_time) >= TURN_DURATION_MS)
-            {
-                state = TURN_COOLDOWN_STATE;
-                state_start_time = now;
-            }
-            break;
-
-        case TURN_COOLDOWN_STATE:
-
-            run_forward();
-
-            if ((unsigned int)(now - state_start_time) >= COOLDOWN_DURATION_MS)
             {
                 state = FOLLOW_LINE;
             }
