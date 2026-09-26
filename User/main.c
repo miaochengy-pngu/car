@@ -8,7 +8,13 @@ void main(void)
 {
     tracking_init();
     motor_init();
-    timer0_init();
+
+    /*
+     * Timer1 只负责状态机毫秒计时。
+     * Timer0 留给 PWM，二者不再冲突。
+     */
+    timer1_init();
+
     line_control_init();
 
     delay_ms(300);
