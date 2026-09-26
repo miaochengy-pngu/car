@@ -3,15 +3,21 @@
 #include "tracking.h"
 #include "line_control.h"
 #include "timer.h"
+#include "pwm.h"
 
 void main(void)
 {
     tracking_init();
+
+    /*
+     * Timer0：软件 PWM，真正实现 40% / 80% / 100% 电机速度。
+     */
+    pwm_init();
     motor_init();
 
     /*
-     * Timer1 只负责状态机毫秒计时。
-     * Timer0 留给 PWM，二者不再冲突。
+     * Timer1：只负责状态机毫秒计时。
+     * 与 Timer0 PWM 相互独立。
      */
     timer1_init();
 
