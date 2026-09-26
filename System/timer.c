@@ -1,29 +1,55 @@
-#include <reg52.h>
+#include <REG52.H>
 #include "timer.h"
 
-volatile unsigned int system_ms = 0;
+/*
+ * 11.0592 MHz、传统 12T：
+ * timer clock = 11.0592 MHz / 12 = 921.6 kHz
+ * 约 1 ms 需要 922 个计数，reload = 65536 - 922 = 0xFC66。
+ *
+ * Timer1 用于状态机计时；Timer0 保留给 PWM。
+ */
+#define TIMER1_RELOAD_H  0xFC
+#define TIMER1_RELOAD_L  0x66
 
-void timer0_init(void)
+static volatile unsigned int g_system_ms = 0;
+
+void timer1_init(void)
 {
-    TMOD &= 0xF0;
-    TMOD |= 0x01;
+    g_system_ms = 0;
 
-    TH0 = (65536 - 1000) / 256;
-    TL0 = (65536 - 1000) % 256;
+    /* 只修改 TMOD 高四位，保留 Timer0 配置。 */
+    TMOD &= 0x0F;
+    TMOD |= 0x10;       /* Timer1 mode 1, 16-bit timer */
 
-    ET0 = 1;
+    TH1 = TIMER1_RELOAD_H;
+    TL1 = TIMER1_RELOAD_L;
+
+    TF1 = 0;
+    ET1 = 1;
     EA = 1;
-    TR0 = 1;
+    TR1 = 1;
 }
 
-void timer0_isr(void) interrupt 1
+unsigned int timer1_get_ms(void)
 {
-    TH0 = (65536 - 1000) / 256;
-    TL0 = (65536 - 1000) % 256;
-    system_ms++;
+    unsigned int now;
+    unsigned char old_et1;
+
+    /*
+     * 8051 是 8 位 CPU，16 位变量读取不是原子的。
+     * 暂时屏蔽 Timer1 中断，避免读到撕裂值。
+     */
+    old_et1 = ET1;
+    ET1 = 0;
+    now = g_system_ms;
+    ET1 = old_et1;
+
+    return now;
 }
 
-unsigned int timer0_get_ms(void)
+void Timer1_ISR(void) interrupt 3 using 2
 {
-    return system_ms;
+    TH1 = TIMER1_RELOAD_H;
+    TL1 = TIMER1_RELOAD_L;
+    g_system_ms++;
 }
