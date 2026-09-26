@@ -11,16 +11,26 @@
  *   黑线 = 1 = 指示灯灭
  */
 
-#define RUN_LEFT_SPEED          100
-#define RUN_RIGHT_SPEED         100
+/*
+ * 正常循迹速度。
+ * 直行：80 / 80
+ * 小幅左修正：40 / 80
+ * 小幅右修正：80 / 40
+ *
+ * 这些数值现在通过 Timer0 软件 PWM 真正作为占空比使用。
+ */
+#define RUN_LEFT_SPEED           80
+#define RUN_RIGHT_SPEED          80
+#define TRACK_INNER_SPEED        40
+#define TRACK_OUTER_SPEED        80
 
 /*
- * 内侧循迹和锁定转弯当前共用这组方向命令。
- * 左转：左轮反转、右轮正转。
- * 右转：左轮正转、右轮反转。
+ * 只有外侧传感器触发 90 度弯道状态时才使用强转弯：
+ * 左转：-100 / +100
+ * 右转：+100 / -100
  */
-#define TURN_INNER_SPEED       -100
-#define TURN_OUTER_SPEED        100
+#define CORNER_INNER_SPEED     -100
+#define CORNER_OUTER_SPEED      100
 
 /*
  * 外侧弯道状态机时间。
